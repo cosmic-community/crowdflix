@@ -8,7 +8,11 @@ interface RevisionHistoryProps {
 }
 
 export default function RevisionHistory({ revisions }: RevisionHistoryProps) {
-  const [expandedRevisions, setExpandedRevisions] = useState<Set<string>>(new Set([revisions[0]?.id]))
+  // Changed: Filter out undefined IDs to ensure Set<string> type
+  const initialId = revisions[0]?.id
+  const [expandedRevisions, setExpandedRevisions] = useState<Set<string>>(
+    new Set(initialId ? [initialId] : [])
+  )
   
   const toggleRevision = (videoId: string) => {
     setExpandedRevisions(prev => {

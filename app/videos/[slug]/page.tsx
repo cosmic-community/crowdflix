@@ -63,7 +63,7 @@ async function getRevisionChain(video: Video): Promise<Video[]> {
         // If it's just an ID, fetch the full object
         const parentId = typeof currentVideo.metadata.parent_video === 'string' 
           ? currentVideo.metadata.parent_video 
-          : currentVideo.metadata.parent_video.id
+          : (currentVideo.metadata.parent_video as Video).id // Changed: Added type assertion to fix TS2339
         
         const parentResponse = await cosmic.objects
           .findOne({ type: 'videos', id: parentId })
