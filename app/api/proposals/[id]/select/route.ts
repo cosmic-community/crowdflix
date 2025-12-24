@@ -78,11 +78,11 @@ export async function POST(
       ? 'veo-3.1-generate-preview' 
       : 'veo-3.1-fast-generate-preview') as 'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview'
     
-    // Changed: Removed unsupported extend_video_url parameter
+    // Generate new video with only supported parameters
     const videoGenerationResult = await cosmic.ai.generateVideo({
       prompt: proposal.metadata.proposed_prompt,
       duration,
-      model,
+      model
     })
     
     const generationTime = Math.floor((Date.now() - startTime) / 1000)
