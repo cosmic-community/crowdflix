@@ -4,6 +4,7 @@ import { CreateVideoFormData } from '@/types'
 
 // Extend serverless function timeout to 5 minutes (300 seconds)
 // This allows the function to wait for video generation to complete
+// Maximum duration for Vercel Pro plan
 export const maxDuration = 300
 
 export async function POST(request: Request) {

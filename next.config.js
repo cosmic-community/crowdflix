@@ -18,6 +18,12 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
+  // Configure function timeout for API routes
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
 }
 
 module.exports = nextConfig

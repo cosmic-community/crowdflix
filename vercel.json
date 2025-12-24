@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "app/api/videos/create/route.ts": {
+      "maxDuration": 300
+    }
+  }
+}
