@@ -68,11 +68,21 @@ export async function POST(
     console.log('[SELECT PROPOSAL] Generating extended video with AI...')
     const startTime = Date.now()
     
+    // Type-safe duration - ensure it's one of the allowed values
+    const duration = video.metadata.duration === 4 || video.metadata.duration === 8 
+      ? video.metadata.duration 
+      : 6 as 4 | 6 | 8
+    
+    // Type-safe model - ensure it's one of the allowed values
+    const model = (video.metadata.veo_model_used === 'veo-3.1-generate-preview' 
+      ? 'veo-3.1-generate-preview' 
+      : 'veo-3.1-fast-generate-preview') as 'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview'
+    
     const videoGenerationResult = await cosmic.ai.generateVideo({
       prompt: proposal.metadata.proposed_prompt,
       extend_video_url: video.metadata.video_file?.url,
-      duration: video.metadata.duration || 6,
-      model: video.metadata.veo_model_used || 'veo-3.1-fast-generate-preview',
+      duration,
+      model,
     })
     
     const generationTime = Math.floor((Date.now() - startTime) / 1000)
