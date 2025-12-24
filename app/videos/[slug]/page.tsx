@@ -49,6 +49,7 @@ async function getProposals(videoId: string): Promise<ExtensionProposal[]> {
 async function getRevisionChain(video: Video): Promise<Video[]> {
   const revisions: Video[] = [video]
   let currentVideo = video
+  const seenIds = new Set<string>([video.id]) // Changed: Track visited IDs to prevent infinite loops
   
   // Traverse backwards through the parent_video chain
   while (currentVideo.metadata.parent_video) {
@@ -56,13 +57,26 @@ async function getRevisionChain(video: Video): Promise<Video[]> {
       const parentVideo = currentVideo.metadata.parent_video
       
       // If parent_video is already a full object (from depth query), use it
-      if (typeof parentVideo === 'object' && parentVideo !== null && 'id' in parentVideo) {
-        // Changed: Properly narrow type with type assertion after validation
+      if (typeof parentVideo === 'object' && parentVideo !== null && 'id' in parentVideo && 'metadata' in parentVideo) {
+        // Changed: Properly type-guard the parent video object
         const fullParentVideo = parentVideo as Video
+        
+        // Changed: Check for circular reference before adding
+        if (seenIds.has(fullParentVideo.id)) {
+          console.warn('[REVISION_CHAIN] Circular reference detected, stopping chain:', fullParentVideo.id)
+          break
+        }
+        
         revisions.push(fullParentVideo)
+        seenIds.add(fullParentVideo.id)
         currentVideo = fullParentVideo
       } else if (typeof parentVideo === 'string') {
-        // Changed: Handle string ID case explicitly
+        // Changed: Handle string ID case explicitly with circular reference check
+        if (seenIds.has(parentVideo)) {
+          console.warn('[REVISION_CHAIN] Circular reference detected (string ID), stopping chain:', parentVideo)
+          break
+        }
+        
         const parentResponse = await cosmic.objects
           .findOne({ type: 'videos', id: parentVideo })
           .props(['id', 'title', 'slug', 'thumbnail', 'metadata'])
@@ -70,14 +84,21 @@ async function getRevisionChain(video: Video): Promise<Video[]> {
         
         const fetchedParentVideo = parentResponse.object as Video
         revisions.push(fetchedParentVideo)
+        seenIds.add(fetchedParentVideo.id)
         currentVideo = fetchedParentVideo
       } else {
         // parent_video is null or invalid, stop the chain
         break
       }
+      
+      // Changed: Safety check - limit chain depth to prevent potential issues
+      if (revisions.length > 100) {
+        console.warn('[REVISION_CHAIN] Maximum chain depth reached (100), stopping')
+        break
+      }
     } catch (error) {
       // If we can't fetch a parent, stop the chain
-      console.error('Error fetching parent video:', error)
+      console.error('[REVISION_CHAIN] Error fetching parent video:', error)
       break
     }
   }
