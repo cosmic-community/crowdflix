@@ -4,6 +4,7 @@ import { Video, ExtensionProposal } from '@/types'
 import VideoPlayer from '@/components/VideoPlayer'
 import ProposalCard from '@/components/ProposalCard'
 import ExtensionForm from '@/components/ExtensionForm'
+import RevisionHistory from '@/components/RevisionHistory'
 import Link from 'next/link'
 
 export const revalidate = 60
@@ -45,6 +46,44 @@ async function getProposals(videoId: string): Promise<ExtensionProposal[]> {
   }
 }
 
+async function getRevisionChain(video: Video): Promise<Video[]> {
+  const revisions: Video[] = [video]
+  let currentVideo = video
+  
+  // Traverse backwards through the parent_video chain
+  while (currentVideo.metadata.parent_video) {
+    try {
+      // If parent_video is already a full object (from depth query), use it
+      if (typeof currentVideo.metadata.parent_video === 'object' && 
+          'id' in currentVideo.metadata.parent_video) {
+        const parentVideo = currentVideo.metadata.parent_video as Video
+        revisions.push(parentVideo)
+        currentVideo = parentVideo
+      } else {
+        // If it's just an ID, fetch the full object
+        const parentId = typeof currentVideo.metadata.parent_video === 'string' 
+          ? currentVideo.metadata.parent_video 
+          : currentVideo.metadata.parent_video.id
+        
+        const parentResponse = await cosmic.objects
+          .findOne({ type: 'videos', id: parentId })
+          .props(['id', 'title', 'slug', 'thumbnail', 'metadata'])
+          .depth(1)
+        
+        const parentVideo = parentResponse.object as Video
+        revisions.push(parentVideo)
+        currentVideo = parentVideo
+      }
+    } catch (error) {
+      // If we can't fetch a parent, stop the chain
+      console.error('Error fetching parent video:', error)
+      break
+    }
+  }
+  
+  return revisions
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const video = await getVideo(slug)
@@ -83,6 +122,7 @@ export default async function VideoPage({ params }: { params: Promise<{ slug: st
   
   const proposals = await getProposals(video.id)
   const pendingProposals = proposals.filter(p => p.metadata.status.key === 'pending')
+  const revisionChain = await getRevisionChain(video)
   
   return (
     <div className="container mx-auto px-4 py-12">
@@ -101,6 +141,9 @@ export default async function VideoPage({ params }: { params: Promise<{ slug: st
           {video.metadata.duration && (
             <span>⏱️ {video.metadata.duration}s</span>
           )}
+          {revisionChain.length > 1 && (
+            <span>🎬 Revision {revisionChain.length}</span>
+          )}
         </div>
         
         {video.metadata.description && (
@@ -108,10 +151,21 @@ export default async function VideoPage({ params }: { params: Promise<{ slug: st
         )}
         
         <div className="card bg-cosmic-gray-900">
-          <h3 className="font-semibold mb-2">Original Prompt:</h3>
+          <h3 className="font-semibold mb-2">Current Prompt:</h3>
           <p className="text-cosmic-gray-400 italic">"{video.metadata.original_prompt}"</p>
         </div>
       </div>
+
+      {/* Revision History Section */}
+      {revisionChain.length > 1 && (
+        <div className="mb-12">
+          <h2 className="text-3xl font-bold mb-6">🎬 Video Evolution</h2>
+          <p className="text-cosmic-gray-400 mb-6">
+            Watch how this story has evolved through {revisionChain.length} community-driven extensions
+          </p>
+          <RevisionHistory revisions={revisionChain} />
+        </div>
+      )}
 
       {/* Extension Proposals Section */}
       <div className="mb-12">
