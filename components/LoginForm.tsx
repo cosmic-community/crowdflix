@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function LoginForm() {
+function LoginFormContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
@@ -88,5 +88,21 @@ export default function LoginForm() {
         {isLoading ? 'Logging in...' : 'Log In'}
       </button>
     </form>
+  )
+}
+
+export default function LoginForm() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-10 bg-cosmic-gray-800 rounded-lg mb-4"></div>
+          <div className="h-10 bg-cosmic-gray-800 rounded-lg mb-4"></div>
+          <div className="h-10 bg-cosmic-gray-800 rounded-lg"></div>
+        </div>
+      </div>
+    }>
+      <LoginFormContent />
+    </Suspense>
   )
 }

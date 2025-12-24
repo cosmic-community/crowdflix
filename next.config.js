@@ -15,9 +15,6 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
   // Configure function timeout for API routes
   experimental: {
     serverActions: {
