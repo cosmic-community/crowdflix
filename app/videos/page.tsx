@@ -7,7 +7,7 @@ export const revalidate = 60
 async function getVideos(): Promise<Video[]> {
   try {
     const response = await cosmic.objects
-      .find({ type: 'videos', 'metadata.status': 'published' })
+      .find({ type: 'videos', 'metadata.status': 'Published' })
       .props(['id', 'title', 'slug', 'thumbnail', 'metadata'])
       .depth(1)
     
