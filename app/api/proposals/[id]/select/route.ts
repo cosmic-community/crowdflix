@@ -77,14 +77,6 @@ export async function POST(
     console.log('[SELECT PROPOSAL] Extending video with AI...')
     const startTime = Date.now()
     
-    // Type-safe duration - ensure it's one of the allowed values (4, 6, or 8)
-    let duration: 4 | 6 | 8 | undefined
-    if (video.metadata.duration === 4 || video.metadata.duration === 6 || video.metadata.duration === 8) {
-      duration = video.metadata.duration
-    } else {
-      duration = 6 // Default to 6 seconds if invalid
-    }
-    
     // Type-safe model - ensure it's one of the allowed values
     let model: 'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview' | undefined
     if (video.metadata.veo_model_used === 'veo-3.1-generate-preview') {
@@ -102,15 +94,14 @@ export async function POST(
     console.log('[SELECT PROPOSAL] Calling extendVideo with:', {
       mediaId: existingMediaName,
       prompt: proposal.metadata.proposed_prompt,
-      duration,
       model
     })
     
     // Extend the video using the existing media
+    // Note: extendVideo does NOT accept duration parameter - it inherits from source video
     const videoExtensionResult = await cosmic.ai.extendVideo({
       media_id: existingMediaName,
       prompt: proposal.metadata.proposed_prompt,
-      duration,
       model
     })
     
