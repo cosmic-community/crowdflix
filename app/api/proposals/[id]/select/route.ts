@@ -73,34 +73,50 @@ export async function POST(
       existingVideoUrl: video.metadata.video_file.url
     })
     
-    // Step 1: Extend the video using Cosmic AI extendVideo method
+    // Step 1: Get the media ID from the video file
+    // Extract the media name from the URL
+    const videoUrl = video.metadata.video_file.url
+    const mediaName = videoUrl.split('/').pop() || ''
+    
+    console.log('[SELECT PROPOSAL] Extracted media name:', mediaName)
+    
+    // Query the media library to get the media ID
+    const mediaResponse = await cosmic.media.findOne({
+      name: mediaName
+    })
+    
+    if (!mediaResponse.media) {
+      console.error('[SELECT PROPOSAL] Media not found in library:', mediaName)
+      return NextResponse.json(
+        { error: 'Video media not found in library' },
+        { status: 404 }
+      )
+    }
+    
+    const mediaId = mediaResponse.media.id
+    console.log('[SELECT PROPOSAL] Found media ID:', mediaId)
+    
+    // Step 2: Extend the video using Cosmic AI extendVideo method
     console.log('[SELECT PROPOSAL] Extending video with AI...')
     const startTime = Date.now()
     
     // Type-safe model - ensure it's one of the allowed values
-    let model: 'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview' | undefined
-    if (video.metadata.veo_model_used === 'veo-3.1-generate-preview') {
-      model = 'veo-3.1-generate-preview'
-    } else if (video.metadata.veo_model_used === 'veo-3.1-fast-generate-preview') {
-      model = 'veo-3.1-fast-generate-preview'
-    } else {
-      model = 'veo-3.1-fast-generate-preview' // Default to fast model
-    }
-    
-    // Get the media ID from the existing video file
-    // The video_file contains the media name, which we use for extending
-    const existingMediaName = video.metadata.video_file.url.split('/').pop() || ''
+    const veoModel = video.metadata.veo_model_used
+    const model: 'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview' = 
+      veoModel === 'veo-3.1-generate-preview' 
+        ? 'veo-3.1-generate-preview' 
+        : 'veo-3.1-fast-generate-preview'
     
     console.log('[SELECT PROPOSAL] Calling extendVideo with:', {
-      mediaId: existingMediaName,
+      mediaId,
       prompt: proposal.metadata.proposed_prompt,
       model
     })
     
-    // Extend the video using the existing media
+    // Extend the video using the media ID
     // Note: extendVideo does NOT accept duration parameter - it inherits from source video
     const videoExtensionResult = await cosmic.ai.extendVideo({
-      media_id: existingMediaName,
+      media_id: mediaId,
       prompt: proposal.metadata.proposed_prompt,
       model
     })
@@ -111,7 +127,7 @@ export async function POST(
       videoUrl: videoExtensionResult.media?.url
     })
     
-    // Step 2: Update the video object with the new extended video file
+    // Step 3: Update the video object with the new extended video file
     console.log('[SELECT PROPOSAL] Updating video object with extended video file...')
     await cosmic.objects.updateOne(videoId, {
       metadata: {
@@ -122,7 +138,7 @@ export async function POST(
       }
     })
     
-    // Step 3: Mark this proposal as selected
+    // Step 4: Mark this proposal as selected
     console.log('[SELECT PROPOSAL] Marking proposal as selected...')
     await cosmic.objects.updateOne(id, {
       metadata: {
@@ -130,7 +146,7 @@ export async function POST(
       }
     })
     
-    // Step 4: Archive all other pending proposals for this video
+    // Step 5: Archive all other pending proposals for this video
     console.log('[SELECT PROPOSAL] Archiving other pending proposals...')
     const allProposalsResponse = await cosmic.objects
       .find({ 
