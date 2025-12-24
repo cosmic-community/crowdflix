@@ -58,44 +58,73 @@ export async function POST(
       )
     }
     
+    // Verify the video has a video file to extend
+    if (!video.metadata.video_file) {
+      return NextResponse.json(
+        { error: 'Video does not have a file to extend' },
+        { status: 400 }
+      )
+    }
+    
     console.log('[SELECT PROPOSAL] Starting video extension generation:', {
       proposalId: id,
       videoId,
-      prompt: proposal.metadata.proposed_prompt
+      prompt: proposal.metadata.proposed_prompt,
+      existingVideoUrl: video.metadata.video_file.url
     })
     
-    // Step 1: Generate extended video using Cosmic AI
-    console.log('[SELECT PROPOSAL] Generating extended video with AI...')
+    // Step 1: Extend the video using Cosmic AI extendVideo method
+    console.log('[SELECT PROPOSAL] Extending video with AI...')
     const startTime = Date.now()
     
-    // Type-safe duration - ensure it's one of the allowed values
-    const duration = video.metadata.duration === 4 || video.metadata.duration === 8 
-      ? video.metadata.duration 
-      : 6 as 4 | 6 | 8
+    // Type-safe duration - ensure it's one of the allowed values (4, 6, or 8)
+    let duration: 4 | 6 | 8 | undefined
+    if (video.metadata.duration === 4 || video.metadata.duration === 6 || video.metadata.duration === 8) {
+      duration = video.metadata.duration
+    } else {
+      duration = 6 // Default to 6 seconds if invalid
+    }
     
     // Type-safe model - ensure it's one of the allowed values
-    const model = (video.metadata.veo_model_used === 'veo-3.1-generate-preview' 
-      ? 'veo-3.1-generate-preview' 
-      : 'veo-3.1-fast-generate-preview') as 'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview'
+    let model: 'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview' | undefined
+    if (video.metadata.veo_model_used === 'veo-3.1-generate-preview') {
+      model = 'veo-3.1-generate-preview'
+    } else if (video.metadata.veo_model_used === 'veo-3.1-fast-generate-preview') {
+      model = 'veo-3.1-fast-generate-preview'
+    } else {
+      model = 'veo-3.1-fast-generate-preview' // Default to fast model
+    }
     
-    // Generate new video with only supported parameters
-    const videoGenerationResult = await cosmic.ai.generateVideo({
+    // Get the media ID from the existing video file
+    // The video_file contains the media name, which we use for extending
+    const existingMediaName = video.metadata.video_file.url.split('/').pop() || ''
+    
+    console.log('[SELECT PROPOSAL] Calling extendVideo with:', {
+      mediaId: existingMediaName,
+      prompt: proposal.metadata.proposed_prompt,
+      duration,
+      model
+    })
+    
+    // Extend the video using the existing media
+    const videoExtensionResult = await cosmic.ai.extendVideo({
+      media_id: existingMediaName,
       prompt: proposal.metadata.proposed_prompt,
       duration,
       model
     })
     
     const generationTime = Math.floor((Date.now() - startTime) / 1000)
-    console.log('[SELECT PROPOSAL] Video generated successfully:', {
+    console.log('[SELECT PROPOSAL] Video extended successfully:', {
       generationTime,
-      videoUrl: videoGenerationResult.media?.url
+      videoUrl: videoExtensionResult.media?.url
     })
     
-    // Step 2: Update the video object with the new video file
-    console.log('[SELECT PROPOSAL] Updating video object with new video file...')
+    // Step 2: Update the video object with the new extended video file
+    console.log('[SELECT PROPOSAL] Updating video object with extended video file...')
     await cosmic.objects.updateOne(videoId, {
       metadata: {
-        video_file: videoGenerationResult.media.name,
+        video_file: videoExtensionResult.media.name,
         original_prompt: proposal.metadata.proposed_prompt,
         parent_video: videoId,
         generation_time: generationTime,
@@ -135,7 +164,7 @@ export async function POST(
     
     return NextResponse.json({
       message: 'Video extended successfully! Your video has been updated with the new extension.',
-      videoUrl: videoGenerationResult.media.url,
+      videoUrl: videoExtensionResult.media.url,
       generationTime,
       archivedProposals: otherProposals.length,
     })
