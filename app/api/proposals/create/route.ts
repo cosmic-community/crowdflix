@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server'
 import { cosmic } from '@/lib/cosmic'
 import { CreateProposalFormData } from '@/types'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function POST(request: Request) {
   try {
+    // Check authentication
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'You must be logged in to create extension proposals' },
+        { status: 401 }
+      )
+    }
+    
     const data: CreateProposalFormData = await request.json()
     
     // Validate required fields
@@ -14,14 +24,14 @@ export async function POST(request: Request) {
       )
     }
     
-    // Create extension proposal
+    // Create extension proposal with authenticated user info
     const proposalResponse = await cosmic.objects.insertOne({
       type: 'extension-proposals',
       title: `Extension: ${data.proposedPrompt.substring(0, 50)}...`,
       metadata: {
         parent_video: data.parentVideoId,
         proposed_prompt: data.proposedPrompt,
-        proposed_by: data.proposedBy || 'Anonymous',
+        proposed_by: user.email,
         upvote_count: 0,
         status: 'pending',
         voter_ids: [],

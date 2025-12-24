@@ -1,20 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function CreateVideoForm() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [formData, setFormData] = useState({
     prompt: '',
     duration: 6 as 4 | 6 | 8,
     description: '',
-    createdBy: '',
   })
+  
+  // Check authentication status on component mount
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const response = await fetch('/api/auth/me')
+        const data = await response.json()
+        setIsAuthenticated(data.success)
+      } catch (error) {
+        console.error('Error checking authentication:', error)
+        setIsAuthenticated(false)
+      } finally {
+        setIsCheckingAuth(false)
+      }
+    }
+    checkAuth()
+  }, [])
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!isAuthenticated) {
+      alert('You must be logged in to create videos')
+      router.push('/login?redirect=/create')
+      return
+    }
     
     if (!formData.prompt.trim()) {
       alert('Please enter a prompt for your video')
@@ -36,6 +60,9 @@ export default function CreateVideoForm() {
         const data = await response.json()
         alert('Video creation started! Processing will take 30-90 seconds.')
         router.push('/videos')
+      } else if (response.status === 401) {
+        alert('You must be logged in to create videos')
+        router.push('/login?redirect=/create')
       } else {
         const error = await response.json()
         alert(error.error || 'Failed to create video')
@@ -46,6 +73,28 @@ export default function CreateVideoForm() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+  
+  if (isCheckingAuth) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-cosmic-gray-400">Loading...</p>
+      </div>
+    )
+  }
+  
+  if (!isAuthenticated) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-cosmic-gray-400 mb-4">You must be logged in to create videos.</p>
+        <button
+          onClick={() => router.push('/login?redirect=/create')}
+          className="btn-primary"
+        >
+          Log In
+        </button>
+      </div>
+    )
   }
   
   return (
@@ -101,21 +150,6 @@ export default function CreateVideoForm() {
           placeholder="Add context or background for your video..."
           className="textarea-field"
           rows={2}
-          disabled={isSubmitting}
-        />
-      </div>
-      
-      <div className="mb-6">
-        <label className="block text-sm font-semibold mb-2" htmlFor="createdBy">
-          Your Name or Email (Optional)
-        </label>
-        <input
-          type="text"
-          id="createdBy"
-          value={formData.createdBy}
-          onChange={(e) => setFormData({ ...formData, createdBy: e.target.value })}
-          placeholder="Anonymous"
-          className="input-field"
           disabled={isSubmitting}
         />
       </div>
