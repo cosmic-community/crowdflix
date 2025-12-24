@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         duration: data.duration,
         description: data.description || '',
         created_by: data.createdBy || 'Anonymous',
-        status: 'processing',
+        status: { key: 'processing', value: 'Processing' },
         view_count: 0,
         parent_video: null,
         veo_model_used: 'veo-3.1-fast-generate-preview',
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
           const updateResult = await cosmic.objects.updateOne(videoId, {
             metadata: {
               video_file: result.media.name,
-              status: 'published',
+              status: { key: 'published', value: 'Published' },
               generation_time: Math.floor(generationTime / 1000),
             }
           })
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         try {
           await cosmic.objects.updateOne(videoId, {
             metadata: {
-              status: 'failed',
+              status: { key: 'failed', value: 'Failed' },
             }
           })
           console.log('[VIDEO_CREATE] Video status updated to failed (no media):', videoId)
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       try {
         await cosmic.objects.updateOne(videoId, {
           metadata: {
-            status: 'failed',
+            status: { key: 'failed', value: 'Failed' },
           }
         })
         console.log('[VIDEO_CREATE] Video status updated to failed:', videoId)
