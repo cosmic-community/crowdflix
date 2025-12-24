@@ -53,26 +53,27 @@ async function getRevisionChain(video: Video): Promise<Video[]> {
   // Traverse backwards through the parent_video chain
   while (currentVideo.metadata.parent_video) {
     try {
+      const parentVideo = currentVideo.metadata.parent_video
+      
       // If parent_video is already a full object (from depth query), use it
-      if (typeof currentVideo.metadata.parent_video === 'object' && 
-          'id' in currentVideo.metadata.parent_video) {
-        const parentVideo = currentVideo.metadata.parent_video as Video
-        revisions.push(parentVideo)
-        currentVideo = parentVideo
-      } else {
-        // If it's just an ID, fetch the full object
-        const parentId = typeof currentVideo.metadata.parent_video === 'string' 
-          ? currentVideo.metadata.parent_video 
-          : (currentVideo.metadata.parent_video as Video).id // Changed: Added type assertion to fix TS2339
-        
+      if (typeof parentVideo === 'object' && parentVideo !== null && 'id' in parentVideo) {
+        // Changed: Properly narrow type with type assertion after validation
+        const fullParentVideo = parentVideo as Video
+        revisions.push(fullParentVideo)
+        currentVideo = fullParentVideo
+      } else if (typeof parentVideo === 'string') {
+        // Changed: Handle string ID case explicitly
         const parentResponse = await cosmic.objects
-          .findOne({ type: 'videos', id: parentId })
+          .findOne({ type: 'videos', id: parentVideo })
           .props(['id', 'title', 'slug', 'thumbnail', 'metadata'])
           .depth(1)
         
-        const parentVideo = parentResponse.object as Video
-        revisions.push(parentVideo)
-        currentVideo = parentVideo
+        const fetchedParentVideo = parentResponse.object as Video
+        revisions.push(fetchedParentVideo)
+        currentVideo = fetchedParentVideo
+      } else {
+        // parent_video is null or invalid, stop the chain
+        break
       }
     } catch (error) {
       // If we can't fetch a parent, stop the chain
