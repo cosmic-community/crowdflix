@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cosmic } from '@/lib/cosmic'
 import { CreateVideoFormData } from '@/types'
+import { getCurrentUser } from '@/lib/auth'
 
 // Extend serverless function timeout to 5 minutes (300 seconds)
 // This allows the function to wait for video generation to complete
@@ -12,12 +13,23 @@ export async function POST(request: Request) {
   console.log('[VIDEO_CREATE] Request received at:', new Date().toISOString())
   
   try {
+    // Check authentication
+    const user = await getCurrentUser()
+    if (!user) {
+      console.log('[VIDEO_CREATE] Unauthorized: No user session')
+      return NextResponse.json(
+        { error: 'You must be logged in to create videos' },
+        { status: 401 }
+      )
+    }
+    
     const data: CreateVideoFormData = await request.json()
     console.log('[VIDEO_CREATE] Request data:', {
       promptLength: data.prompt?.length,
       duration: data.duration,
       hasDescription: !!data.description,
-      createdBy: data.createdBy || 'Anonymous'
+      createdBy: user.email,
+      userId: user.id
     })
     
     // Validate required fields
@@ -43,7 +55,7 @@ export async function POST(request: Request) {
     }
     
     console.log('[VIDEO_CREATE] Creating Cosmic object...')
-    // Create video object with processing status
+    // Create video object with processing status - use authenticated user info
     const videoResponse = await cosmic.objects.insertOne({
       type: 'videos',
       title: data.prompt.substring(0, 60) + (data.prompt.length > 60 ? '...' : ''),
@@ -51,7 +63,7 @@ export async function POST(request: Request) {
         original_prompt: data.prompt,
         duration: data.duration,
         description: data.description || '',
-        created_by: data.createdBy || 'Anonymous',
+        created_by: user.email,
         status: { key: 'processing', value: 'Processing' },
         view_count: 0,
         parent_video: null,

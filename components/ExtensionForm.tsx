@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface ExtensionFormProps {
@@ -10,14 +10,38 @@ interface ExtensionFormProps {
 export default function ExtensionForm({ videoId }: ExtensionFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [formData, setFormData] = useState({
     proposedPrompt: '',
-    proposedBy: '',
     notes: '',
   })
   
+  // Check authentication status on component mount
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const response = await fetch('/api/auth/me')
+        const data = await response.json()
+        setIsAuthenticated(data.success)
+      } catch (error) {
+        console.error('Error checking authentication:', error)
+        setIsAuthenticated(false)
+      } finally {
+        setIsCheckingAuth(false)
+      }
+    }
+    checkAuth()
+  }, [])
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!isAuthenticated) {
+      alert('You must be logged in to submit extension proposals')
+      router.push(`/login?redirect=/videos/${videoId}`)
+      return
+    }
     
     if (!formData.proposedPrompt.trim()) {
       alert('Please enter a prompt for the extension')
@@ -35,15 +59,17 @@ export default function ExtensionForm({ videoId }: ExtensionFormProps) {
         body: JSON.stringify({
           parentVideoId: videoId,
           proposedPrompt: formData.proposedPrompt,
-          proposedBy: formData.proposedBy || 'Anonymous',
           notes: formData.notes,
         }),
       })
       
       if (response.ok) {
         alert('Extension proposal submitted successfully!')
-        setFormData({ proposedPrompt: '', proposedBy: '', notes: '' })
+        setFormData({ proposedPrompt: '', notes: '' })
         router.refresh()
+      } else if (response.status === 401) {
+        alert('You must be logged in to submit extension proposals')
+        router.push(`/login?redirect=/videos/${videoId}`)
       } else {
         const error = await response.json()
         alert(error.error || 'Failed to submit proposal')
@@ -54,6 +80,28 @@ export default function ExtensionForm({ videoId }: ExtensionFormProps) {
     } finally {
       setIsSubmitting(false)
     }
+  }
+  
+  if (isCheckingAuth) {
+    return (
+      <div className="card">
+        <p className="text-center text-cosmic-gray-400">Loading...</p>
+      </div>
+    )
+  }
+  
+  if (!isAuthenticated) {
+    return (
+      <div className="card text-center">
+        <p className="text-cosmic-gray-400 mb-4">You must be logged in to submit extension proposals.</p>
+        <button
+          onClick={() => router.push(`/login?redirect=/videos/${videoId}`)}
+          className="btn-primary"
+        >
+          Log In
+        </button>
+      </div>
+    )
   }
   
   return (
@@ -88,21 +136,6 @@ export default function ExtensionForm({ videoId }: ExtensionFormProps) {
           placeholder="Explain your reasoning or creative vision..."
           className="textarea-field"
           rows={2}
-          disabled={isSubmitting}
-        />
-      </div>
-      
-      <div className="mb-6">
-        <label className="block text-sm font-semibold mb-2" htmlFor="proposedBy">
-          Your Name or Email (Optional)
-        </label>
-        <input
-          type="text"
-          id="proposedBy"
-          value={formData.proposedBy}
-          onChange={(e) => setFormData({ ...formData, proposedBy: e.target.value })}
-          placeholder="Anonymous"
-          className="input-field"
           disabled={isSubmitting}
         />
       </div>
