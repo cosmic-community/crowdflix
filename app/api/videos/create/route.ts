@@ -75,8 +75,7 @@ export async function POST(request: Request) {
     })
     const generationStartTime = Date.now()
     
-    // Start the promise but don't await it (fire and forget)
-    cosmic.ai.generateVideo({
+    await cosmic.ai.generateVideo({
       prompt: data.prompt,
       duration: data.duration,
       model: 'veo-3.1-fast-generate-preview',
